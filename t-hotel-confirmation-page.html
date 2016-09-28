@@ -1,0 +1,214 @@
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="../juicy-html/juicy-html.html">
+<link rel="import" href="../t-notify/t-notify.html">
+<link rel="import" href="../t-hotel-itinerary-details/t-hotel-itinerary-details.html">
+<link rel="import" href="../t-section-header/t-section-header.html">
+<link rel="import" href="../t-header/t-header.html">
+<link rel="import" href="../t-text-container/travel-element-styles.html">
+<link rel="import" href="../iron-flex-layout/iron-flex-layout-classes.html"/>
+<link rel="import" href="../t-car-result-item/t-car-result-item.html" />
+<link rel="import" href="../t-sessionstorage/t-sessionstorage.html">
+<link rel="import" href="../t-shared-lib/t-confirmation-behavior.html">
+<link rel="import" href="../t-shared-lib/t-date-behavior.html">
+<link rel="import" href="../t-behavior/t-page-behavior.html">
+<link rel="import" href="../t-behavior/t-session-behavior.html"/>
+
+<!--
+    <h3>Details:</h3>
+
+        `t-hotel-confirmation-page` is a hotel confirmation page component which displays booked itinerary information.
+
+        It uses following child components in it -
+            1. `t-notify`
+            2. `t-header`
+            4. `t-hotel-itinerary-details`
+            5. `t-faredetails`
+            6. `t-sessionstorage`
+
+    <h3>Events:</h3>
+
+        following events are fired by this component
+
+            1. 'confirmation-error' - fired when error is occured while fetching booked itinerary from session, session is currently not used in this page.
+            2. 'confirmation-success' - fired when confirmation page is loaded succesfully.
+            3. `go-to-search` - fired when page is loaded without required page data.
+
+    <h3>Example:</h3>
+
+        <t-hotel-confirmation-page
+            id="confirmation"
+            success-icon="[[successIcon]]"
+            api-base-url="[[apiBaseUrl]]"
+            auth-token="[[authToken]]"
+            booked-itinerary="[[bookedItinerary]]"
+            api-url-format="[[apiUrlFormat]]">
+            <t-header
+                icon="home"
+                on-left-button-click="_goToSearch"
+                label="Confirmation"
+                normal-heading>
+            </t-header>
+        </t-hotel-confirmation-page>
+
+    @demo demo/index.html
+-->
+
+<dom-module id="t-hotel-confirmation-page">
+    <template>
+        <style include="t-car-result-item"></style>
+        <style include="iron-flex"></style>
+        <style include="travel-element-styles">
+            :host {
+                display: block;
+                font-family: var(--header-font-family, --primary-font-family);
+                font-size: var(--font-14, 14px);
+            }
+            .payable {
+                font-size: var(--font-18, 18px);
+            }
+
+            .item{
+                padding: 10px 0;
+            }
+        </style>
+
+        <content select="t-header"></content>
+
+        <t-notify id="notify" success-icon="[[successIcon]]" type="success"></t-notify>
+
+        <t-section-header class="margin-bottom" label="Trip Summary"></t-section-header>
+
+        <t-hotel-itinerary-details
+            itinerary="[[bookedItinerary.itinerary]]"
+            selected-room="[[selectedRoom]]"
+            hotel-icon="[[hotelIcon]]"
+            api-base-url="[[apiBaseUrl]]"
+            auth-token="[[authToken]]"
+            search-id="[[searchId]]">
+        </t-hotel-itinerary-details>
+
+        <t-section-header class="margin-bottom" label="Guest Info"></t-section-header>
+
+        <div class="section-small font-14">
+            <template is="dom-repeat" items="[[bookedItinerary.passengers]]">
+                <div class="margin-bottom">
+                    <span class="name flex font-16">[[_capitalize(item.title, item.firstName, item.lastName)]]</span>
+                    <span class="secondary-text">Confirmation # -&nbsp;</span>
+                    <span class=""> [[confirmationNumber]]</span>
+                </div>
+            </template>
+        </div>
+
+        <t-faredetails
+            id="fareDetails"
+            is-collapsible
+            data="[[selectedRoom.fare.components]]" 
+            passenger-details="[[paxCountMap]]">
+        </t-faredetails>
+
+        <t-sessionstorage
+            id="sessionStore"
+            api-url-format="[[apiUrlFormat]]"
+            on-t-sessionstorage-load-success="_onSessionGet"
+            on-t-sessionstorage-save-success="_onSessionSave">
+        </t-sessionstorage>
+    </template>
+
+    <script>
+        (function () {
+            
+            'use strict'
+
+            Polymer({
+                is: 't-hotel-confirmation-page',
+
+                behaviors: [
+                    TravelNxt.Behaviors.ConfirmationBehavior,
+                    TravelNxt.Behaviors.DateBehavior,
+                    TravelNxt.Behaviors.PageBehavior,
+                    TravelNxt.Behaviors.SessionBehavior
+                ],
+
+                properties: {
+
+                    /*
+                     * <p>This property holds the value of selected date of selected room</p>
+                     */
+                    selectedRoom: {
+                        type: Object,
+                        notify: true
+                    }                  
+                },
+
+                listeners: {
+                    'session-get-complete': '_updatePage'
+                },
+
+                /*
+                 * <p>this method gets called when page becomes visible</p>
+                 * <p>`go-to-search` event is fired if `bookedItinerary` property is not set.</p>
+                */
+                __pageLoad: function(visible) {
+                    if (!visible) {
+                        return;
+                    }
+                    this.$.notify.active = false;
+
+                    this._syncSession();
+                },
+
+                _updatePage: function  () {
+
+                    if (!this.bookedItinerary) {
+                        this.fire('go-to-search');
+                    }
+                    
+                    this._setFareDetails();
+                    this._getConfirmationMessage();
+                    this._setConfirmationNumber();
+                },
+
+                _syncSession: function () {
+                    this._data = [{
+                        key: 'Hotel_Booked_Itinerary',
+                        propertyName: 'bookedResponse'
+                    },{
+                        key: 'Hotel_Room',
+                        propertyName: 'selectedRoom'
+                    },{
+                        key: 'Hotel_Search_Criteria',
+                        propertyName: 'searchCriteria'
+                    }];
+                    this.getSession();
+                },
+
+                /*
+                 * <p>This is a translator method to set fare details data</p>
+                */
+                _setFareDetails: function () {
+                    if (!this.bookedItinerary.itinerary || !this.searchCriteria) {
+                        return;
+                    }
+
+                    this.paxCountMap = [{ 
+                        type: "Adult", 
+                        quantity: this.searchCriteria.adultCount 
+                    }];
+
+                    if (this.searchCriteria.childCount > 0) {
+                        this.paxCountMap.push({ 
+                            type: "Child", 
+                            quantity: this.searchCriteria.childCount 
+                        });
+                    }
+
+                    var nights = this._dateDiff(this.bookedItinerary.itinerary.stayDuration.start.date, this.bookedItinerary.itinerary.stayDuration.end.date);
+
+                    this.$.fareDetails.itineraryFareLabel = nights + (nights > 1 ? " Nights Fare" : " Night Fare");
+                    this.$.fareDetails.baseFareLabel = "Avg. per night fare x " + nights;                    
+                },
+            });
+
+        })();
+    </script>
+</dom-module>
