@@ -6,7 +6,7 @@
     "polymer": "Polymer/polymer#^1.4.0",
     "juicy-html": "Juicy/juicy-html#^1.1.0",
     "t-notify": "atomelements/t-notify#^1.1.1",
-    "t-hotel-itinerary-details": "travelnxtelements/t-hotel-itinerary-details",
+    "t-hotel-itinerary-details": "travelnxtelements/t-hotel-itinerary-details#master",
     "t-section-header": "atomelements/t-section-header#^1.0.4",
     "t-header": "travelnxtelements/t-header#^1.5.11",
     "t-text-container": "travelnxtelements/t-text-container#^1.1.2",
